@@ -1,9 +1,23 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 import tkinter as tk
 import tkinter.font as tkFont
 import time
 import os
 import configparser
-from turtle import width
+#from turtle import width
+
+##from dataclasses import dataclass
+##
+##@dataclass
+##class :
+##    x: float
+##    y: float
+##    z: float = 0.0
+
+
+config_file = "infoscreen.ini"
 
 class App(tk.Tk):
     def __init__(self, font_size):
@@ -54,6 +68,8 @@ class App(tk.Tk):
     def update(self) -> None:
         local_time = time.localtime()
 
+        #countdown_limit.h = 13
+
         self.countdown_time.set(f"{local_time.tm_hour:02d}:{local_time.tm_min:02d}:{local_time.tm_sec:02d}")
 
         self.energy_cost.set("396,34 EUR/MWh")
@@ -68,7 +84,13 @@ class App(tk.Tk):
 
 if __name__ == "__main__":
     config = configparser.ConfigParser()
-    config.read('infoscreen.ini')
+
+    if not os.path.exists(config_file):
+        with open(config_file, "w") as f:
+            config.write(f)
+
+
+    config.read(config_file)
     font_size = config['DISPLAY']['FontSize']
     #print("Verdi: ", str(config['DISPLAY']['FontSize']))
     #print(os.getcwd())
