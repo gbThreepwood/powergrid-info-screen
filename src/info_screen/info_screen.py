@@ -4,8 +4,12 @@
 import tkinter as tk
 import tkinter.font as tkFont
 import time
+from datetime import datetime, timedelta
 import os
 import configparser
+
+import energy_cost
+
 #from turtle import width
 
 ##from dataclasses import dataclass
@@ -20,11 +24,21 @@ import configparser
 config_file = "infoscreen.ini"
 
 class App(tk.Tk):
-    def __init__(self, font_size):
+    def __init__(self, config):
         super().__init__()
 
+        self.font_size = config['DISPLAY']['FontSize']
+        self.enable_count_down_timer = config['DISPLAY']['CountDownTimer']
+
+        self.prev_price_nok_kwh = 0
+
+        exchange_rate = 9.96
+        self.cost = energy_cost.EnergyCost(exchange_rate)
+
+        #print("Pris: ", self.cost.GetCurrentCost())
+
         self.title('Informasjon om kraftnettet')
-        self.geometry('1500x300')
+        self.geometry('1600x300')
 
         self.frame = tk.Frame(self, bg='black')
         self.frame.pack(fill=tk.BOTH, expand=1)
@@ -32,7 +46,7 @@ class App(tk.Tk):
         self.countdown_time = tk.StringVar()
         self.energy_cost = tk.StringVar()
 
-        self.display_font = tkFont.Font(family='Courier New', size=font_size)
+        self.display_font = tkFont.Font(family='Courier New', size=self.font_size)
         self.time_label = tk.Label( self.frame,
                                     textvariable=self.countdown_time,
                                     font=self.display_font,
@@ -63,16 +77,48 @@ class App(tk.Tk):
 
         self.bind('<Configure>', self.resize)
 
+        self.after(20, self.update_price)
         self.after(20, self.update)
 
+    def update_price(self) -> None:
+        # Store the previous price if it has changed
+        #if(self.price_nok_kwh != self.prev_price_nok_kwh):
+        #    self.prev_price_nok_kwh = self.price_nok_kwh
+
+        self.price_nok_kwh = self.cost.GetCurrentCost()
+        self.after(20000, self.update_price)
+
     def update(self) -> None:
-        local_time = time.localtime()
 
         #countdown_limit.h = 13
 
-        self.countdown_time.set(f"{local_time.tm_hour:02d}:{local_time.tm_min:02d}:{local_time.tm_sec:02d}")
+        if(self.enable_count_down_timer == "True"):
 
-        self.energy_cost.set("396,34 EUR/MWh")
+            now = datetime.today()
+
+            seconds = (timedelta(hours=24) - (now - now.replace(hour=13, minute=0, second=0, microsecond=0))).total_seconds() % (24 * 3600)
+            delta = timedelta(seconds = seconds)
+            # TODO: Change to work for any date
+            #later = datetime.fromisoformat('2022-09-13 13:00:00')
+            #delta = later - now
+            
+            days, hours, minutes, seconds = self.td_to_days_hours_minutes_seconds(delta)
+            self.countdown_time.set(f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+        else:
+            local_time = time.localtime()
+            self.countdown_time.set(f"{local_time.tm_hour:02d}:{local_time.tm_min:02d}:{local_time.tm_sec:02d}")
+
+        #direction_arrow = "⇅"
+
+        #self.energy_cost.set("396,34 EUR/MWh")
+        if self.price_nok_kwh > self.prev_price_nok_kwh:
+            direction_arrow = "↑"
+        elif self.price_nok_kwh < self.prev_price_nok_kwh:
+            direction_arrow = "↓"
+        else: # In the unlikely case that the price has not changed.
+            direction_arrow = "⇅"
+
+        self.energy_cost.set(f"{self.price_nok_kwh*100:.2f} øre/kWh " + direction_arrow)
 
         self.after(500, self.update)
 
@@ -80,6 +126,12 @@ class App(tk.Tk):
         new_size = -max(12, int((self.frame.winfo_width() / 10)))
         self.display_font.configure(size=new_size)
         #new_size = -max(12, int((self.frame.winfo_height() / 30)))
+
+    def td_to_days_hours_minutes_seconds(self, td):
+        days, hours, minutes  = td.days, td.seconds // 3600, td.seconds %3600//60
+        seconds = td.seconds - hours*3600 - minutes*60
+        return days, hours, minutes, seconds
+        #return td.days, td.seconds//3600, (td.seconds//60)%60, 0
 
 
 if __name__ == "__main__":
@@ -91,8 +143,9 @@ if __name__ == "__main__":
 
 
     config.read(config_file)
-    font_size = config['DISPLAY']['FontSize']
+
     #print("Verdi: ", str(config['DISPLAY']['FontSize']))
     #print(os.getcwd())
-    app = App(font_size)
+    app = App(config) #font_size)
+    app.wm_attributes('-fullscreen', 'True')
     app.mainloop()
